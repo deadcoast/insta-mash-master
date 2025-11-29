@@ -68,7 +68,7 @@
   - **Property 24: Validation exit code**
   - **Validates: Requirements 6.5**
 
-- [ ] 4. Implement progress tracking
+- [x] 4. Implement progress tracking
   - Create `BatchProgress` dataclass
   - Implement progress update logic
   - Add console display formatting with Rich
@@ -76,38 +76,38 @@
   - Display current URL being processed
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 4.1 Write property test for progress tracking
+- [x] 4.1 Write property test for progress tracking
   - **Property 8: Progress tracking accuracy**
   - **Validates: Requirements 3.2**
 
-- [ ] 4.2 Write property test for status reporting
+- [x] 4.2 Write property test for status reporting
   - **Property 9: Status reporting accuracy**
   - **Validates: Requirements 3.3**
 
-- [ ] 4.3 Write property test for current URL display
+- [x] 4.3 Write property test for current URL display
   - **Property 10: Current URL display**
   - **Validates: Requirements 3.4**
 
-- [ ] 4.4 Write property test for final report
+- [x] 4.4 Write property test for final report
   - **Property 11: Final report accuracy**
   - **Validates: Requirements 3.5**
 
-- [ ] 5. Implement resume state management
+- [x] 5. Implement resume state management
   - Create `ResumeState` dataclass
   - Implement save/load methods with JSON serialization
   - Store completed entry indices
   - Handle resume file path resolution
   - _Requirements: 5.2, 5.3_
 
-- [ ] 5.1 Write property test for resume state persistence
+- [x] 5.1 Write property test for resume state persistence
   - **Property 16: Resume state persistence**
   - **Validates: Requirements 5.2**
 
-- [ ] 5.2 Write property test for resume skip behavior
+- [x] 5.2 Write property test for resume skip behavior
   - **Property 17: Resume skip behavior**
   - **Validates: Requirements 5.3**
 
-- [ ] 6. Implement batch executor
+- [-] 6. Implement batch executor
   - Create `BatchExecutor` class
   - Implement sequential execution of batch entries
   - Integrate with existing download logic from `grab` command

@@ -6,7 +6,9 @@ Handles parsing and processing of batch files containing multiple URLs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -220,3 +222,297 @@ class BatchFile:
                     ))
 
         return errors
+
+
+@dataclass
+class BatchProgress:
+    """Tracks batch execution progress."""
+
+    total: int
+    completed: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    current_url: str = ""
+    errors: list[tuple[str, str]] = field(default_factory=list)  # (url, error_message)
+
+    def update(self, success: bool, url: str = "", error: str = "") -> None:
+        """
+        Update progress after completing a download.
+
+        Args:
+            success: Whether the download succeeded
+            url: The URL that was processed
+            error: Error message if the download failed
+        """
+        self.completed += 1
+        if success:
+            self.succeeded += 1
+        else:
+            self.failed += 1
+            if url and error:
+                self.errors.append((url, error))
+
+    def set_current_url(self, url: str) -> None:
+        """
+        Set the current URL being processed.
+
+        Args:
+            url: The URL currently being processed
+        """
+        self.current_url = url
+
+    def display(self) -> str:
+        """
+        Display current progress to console.
+
+        Returns:
+            Formatted progress string
+        """
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
+
+        console = Console()
+        
+        # Build progress text
+        progress_text = Text()
+        progress_text.append(f"Progress: {self.completed}/{self.total}\n", style="bold cyan")
+        progress_text.append(f"✓ Succeeded: {self.succeeded}  ", style="green")
+        progress_text.append(f"✗ Failed: {self.failed}\n", style="red")
+        
+        if self.current_url:
+            progress_text.append(f"\nCurrent: {self.current_url}", style="yellow")
+        
+        # Create panel
+        panel = Panel(progress_text, title="Batch Progress", border_style="blue")
+        
+        # Render to string
+        with console.capture() as capture:
+            console.print(panel)
+        
+        return capture.get()
+
+    def get_final_report(self) -> str:
+        """
+        Generate final report after batch completion.
+
+        Returns:
+            Formatted final report string
+        """
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.text import Text
+
+        console = Console()
+        
+        # Build summary
+        summary = Text()
+        summary.append("Batch Complete!\n\n", style="bold green")
+        summary.append(f"Total: {self.total}\n", style="bold")
+        summary.append(f"✓ Succeeded: {self.succeeded}\n", style="green")
+        summary.append(f"✗ Failed: {self.failed}\n", style="red")
+        
+        # Add error details if any
+        if self.errors:
+            summary.append("\nErrors:\n", style="bold red")
+            for url, error in self.errors:
+                summary.append(f"  • {url}\n", style="yellow")
+                summary.append(f"    {error}\n", style="dim")
+        
+        # Create panel
+        panel = Panel(summary, title="Final Report", border_style="green" if self.failed == 0 else "red")
+        
+        # Render to string
+        with console.capture() as capture:
+            console.print(panel)
+        
+        return capture.get()
+
+
+@dataclass
+class ResumeState:
+    """State for resuming interrupted batch operations."""
+
+    batch_file_path: Path
+    completed_indices: set[int]
+    timestamp: datetime
+
+    def save(self, path: Path) -> None:
+        """
+        Save resume state to file.
+
+        Args:
+            path: Path where the resume state should be saved
+        """
+        # Ensure parent directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Convert to JSON-serializable format
+        data = {
+            "batch_file_path": str(self.batch_file_path),
+            "completed_indices": sorted(list(self.completed_indices)),
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+        # Write to file
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load(cls, path: Path) -> Optional[ResumeState]:
+        """
+        Load resume state from file.
+
+        Args:
+            path: Path to the resume state file
+
+        Returns:
+            ResumeState if file exists and is valid, None otherwise
+        """
+        if not path.exists():
+            return None
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            return cls(
+                batch_file_path=Path(data["batch_file_path"]),
+                completed_indices=set(data["completed_indices"]),
+                timestamp=datetime.fromisoformat(data["timestamp"]),
+            )
+        except (json.JSONDecodeError, KeyError, ValueError):
+            # Invalid resume file
+            return None
+
+
+class BatchExecutor:
+    """Executes batch downloads with progress tracking."""
+
+    def __init__(
+        self,
+        batch_file: BatchFile,
+        config: Config,
+        delay: float = 0.0,
+        dry_run: bool = False,
+        resume_state: Optional[ResumeState] = None,
+    ):
+        """
+        Initialize batch executor.
+
+        Args:
+            batch_file: The batch file to execute
+            config: Configuration object
+            delay: Delay in seconds between downloads
+            dry_run: If True, simulate without downloading
+            resume_state: Optional resume state to skip completed entries
+        """
+        self.batch_file = batch_file
+        self.config = config
+        self.delay = delay
+        self.dry_run = dry_run
+        self.resume_state = resume_state
+        self.progress = BatchProgress(total=len(batch_file.entries))
+
+    def execute(self) -> BatchProgress:
+        """
+        Execute all downloads in batch.
+
+        Returns:
+            BatchProgress object with final results
+        """
+        import subprocess
+        import time
+        from rich.console import Console
+
+        console = Console()
+
+        for index, entry in enumerate(self.batch_file.entries):
+            # Skip if already completed (resume functionality)
+            if self.resume_state and index in self.resume_state.completed_indices:
+                continue
+
+            # Set current URL in progress
+            self.progress.set_current_url(entry.url)
+
+            # Display progress
+            console.print(self.progress.display())
+
+            # Execute the entry
+            success = self.execute_entry(entry)
+
+            # Update progress
+            if not success:
+                # Get the last error from progress.errors if available
+                error_msg = self.progress.errors[-1][1] if self.progress.errors else "Unknown error"
+                self.progress.update(success=False, url=entry.url, error=error_msg)
+            else:
+                self.progress.update(success=True, url=entry.url)
+
+            # Apply delay between downloads (except after last one)
+            if self.delay > 0 and index < len(self.batch_file.entries) - 1:
+                time.sleep(self.delay)
+
+        return self.progress
+
+    def execute_entry(self, entry: BatchEntry) -> bool:
+        """
+        Execute a single batch entry.
+
+        Args:
+            entry: The batch entry to execute
+
+        Returns:
+            True if successful, False otherwise
+        """
+        import subprocess
+        import os
+        from rich.console import Console
+
+        console = Console()
+
+        try:
+            # Resolve options for this entry
+            options = entry.resolve_options(self.config)
+
+            # Build gallery-dl command
+            cmd = ["gallery-dl"]
+            cmd.extend(options.to_gallery_dl_args())
+
+            if self.dry_run:
+                cmd.append("-s")
+
+            cmd.append(entry.url)
+
+            # Create destination directory if not dry-run
+            if options.destination and not self.dry_run:
+                Path(os.path.expanduser(options.destination)).mkdir(parents=True, exist_ok=True)
+
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout per download
+            )
+
+            if result.returncode != 0:
+                # Log error
+                error_msg = result.stderr.strip() if result.stderr else f"Exit code {result.returncode}"
+                console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
+                self.progress.errors.append((entry.url, error_msg))
+                return False
+
+            return True
+
+        except subprocess.TimeoutExpired:
+            error_msg = "Download timed out after 5 minutes"
+            console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
+            self.progress.errors.append((entry.url, error_msg))
+            return False
+        except Exception as e:
+            error_msg = str(e)
+            console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
+            self.progress.errors.append((entry.url, error_msg))
+            return False

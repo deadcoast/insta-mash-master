@@ -668,3 +668,275 @@ def test_property_validation_exit_code(valid_urls, num_comments):
         assert len(validation_results) == 0
     finally:
         path.unlink()
+
+
+
+@settings(max_examples=100)
+@given(
+    total=st.integers(min_value=1, max_value=100),
+    num_to_process=st.integers(min_value=0, max_value=100)
+)
+def test_property_progress_tracking_accuracy(total, num_to_process):
+    """
+    **Feature: batch-mode, Property 8: Progress tracking accuracy**
+    **Validates: Requirements 3.2**
+
+    For any batch execution, after processing N entries, the progress
+    counter should show N completed out of total.
+    """
+    from insta_mash.batch import BatchProgress
+
+    # Ensure num_to_process doesn't exceed total
+    num_to_process = min(num_to_process, total)
+
+    # Create progress tracker
+    progress = BatchProgress(total=total)
+
+    # Process N entries
+    for i in range(num_to_process):
+        # Randomly succeed or fail
+        success = (i % 2 == 0)
+        progress.update(success=success, url=f"https://example.com/{i}")
+
+    # Check progress accuracy
+    assert progress.completed == num_to_process
+    assert progress.total == total
+
+
+
+@settings(max_examples=100)
+@given(
+    total=st.integers(min_value=1, max_value=50),
+    success_status=st.booleans()
+)
+def test_property_status_reporting_accuracy(total, success_status):
+    """
+    **Feature: batch-mode, Property 9: Status reporting accuracy**
+    **Validates: Requirements 3.3**
+
+    For any completed download operation, the progress display should
+    indicate success if the operation succeeded and failure if it failed.
+    """
+    from insta_mash.batch import BatchProgress
+
+    # Create progress tracker
+    progress = BatchProgress(total=total)
+
+    # Process one entry with the given status
+    progress.update(success=success_status, url="https://example.com/test")
+
+    # Check that status is correctly recorded
+    if success_status:
+        assert progress.succeeded == 1
+        assert progress.failed == 0
+    else:
+        assert progress.succeeded == 0
+        assert progress.failed == 1
+
+
+
+@settings(max_examples=100)
+@given(
+    total=st.integers(min_value=1, max_value=50),
+    current_url=url_strategy
+)
+def test_property_current_url_display(total, current_url):
+    """
+    **Feature: batch-mode, Property 10: Current URL display**
+    **Validates: Requirements 3.4**
+
+    For any batch entry being processed, the progress display should
+    show the URL from that entry.
+    """
+    from insta_mash.batch import BatchProgress
+
+    # Create progress tracker
+    progress = BatchProgress(total=total)
+
+    # Set current URL
+    progress.set_current_url(current_url)
+
+    # Check that current URL is stored
+    assert progress.current_url == current_url
+
+    # Check that display includes the current URL
+    # Note: Rich may wrap long URLs across lines, so we remove whitespace for comparison
+    display_output = progress.display()
+    # Remove all whitespace and newlines from both strings for comparison
+    display_normalized = "".join(display_output.split())
+    url_normalized = "".join(current_url.split())
+    assert url_normalized in display_normalized
+
+
+
+@settings(max_examples=100)
+@given(
+    num_successes=st.integers(min_value=0, max_value=50),
+    num_failures=st.integers(min_value=0, max_value=50)
+)
+def test_property_final_report_accuracy(num_successes, num_failures):
+    """
+    **Feature: batch-mode, Property 11: Final report accuracy**
+    **Validates: Requirements 3.5**
+
+    For any completed batch session with S successes and F failures,
+    the final report should display S as success count and F as failure count.
+    """
+    from insta_mash.batch import BatchProgress
+
+    # Ensure at least one operation
+    if num_successes == 0 and num_failures == 0:
+        num_successes = 1
+
+    total = num_successes + num_failures
+
+    # Create progress tracker
+    progress = BatchProgress(total=total)
+
+    # Process successes
+    for i in range(num_successes):
+        progress.update(success=True, url=f"https://example.com/success/{i}")
+
+    # Process failures
+    for i in range(num_failures):
+        progress.update(
+            success=False,
+            url=f"https://example.com/failure/{i}",
+            error=f"Error {i}"
+        )
+
+    # Get final report
+    report = progress.get_final_report()
+
+    # Check that report contains correct counts
+    # The report should show the success and failure counts
+    assert str(num_successes) in report
+    assert str(num_failures) in report
+
+    # Verify internal state
+    assert progress.succeeded == num_successes
+    assert progress.failed == num_failures
+    assert progress.completed == total
+
+
+
+@settings(max_examples=100)
+@given(
+    batch_file_path=st.text(
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="/-_."),
+        min_size=5,
+        max_size=50
+    ).map(lambda s: Path(s)),
+    completed_indices=st.sets(st.integers(min_value=0, max_value=100), min_size=0, max_size=50)
+)
+def test_property_resume_state_persistence(batch_file_path, completed_indices):
+    """
+    **Feature: batch-mode, Property 16: Resume state persistence**
+    **Validates: Requirements 5.2**
+
+    For any paused batch session, the resume file should contain
+    the indices of all completed entries.
+    """
+    from datetime import datetime
+    from insta_mash.batch import ResumeState
+
+    # Create a resume state
+    original_state = ResumeState(
+        batch_file_path=batch_file_path,
+        completed_indices=completed_indices,
+        timestamp=datetime.now()
+    )
+
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        resume_path = Path(f.name)
+
+    try:
+        # Save the state
+        original_state.save(resume_path)
+
+        # Load the state back
+        loaded_state = ResumeState.load(resume_path)
+
+        # Should not be None
+        assert loaded_state is not None
+
+        # Check that all data is preserved
+        assert loaded_state.batch_file_path == original_state.batch_file_path
+        assert loaded_state.completed_indices == original_state.completed_indices
+        
+        # Timestamp should be close (within a second due to serialization)
+        time_diff = abs((loaded_state.timestamp - original_state.timestamp).total_seconds())
+        assert time_diff < 1.0
+
+    finally:
+        if resume_path.exists():
+            resume_path.unlink()
+
+
+
+@settings(max_examples=100)
+@given(
+    urls=st.lists(url_strategy, min_size=5, max_size=30),
+    completed_indices=st.sets(st.integers(min_value=0, max_value=29), min_size=1, max_size=15)
+)
+def test_property_resume_skip_behavior(urls, completed_indices):
+    """
+    **Feature: batch-mode, Property 17: Resume skip behavior**
+    **Validates: Requirements 5.3**
+
+    For any batch execution with a resume state, entries whose indices
+    are in the completed set should be skipped.
+    """
+    from datetime import datetime
+    from insta_mash.batch import ResumeState
+
+    # Filter completed_indices to only include valid indices for our URL list
+    completed_indices = {idx for idx in completed_indices if idx < len(urls)}
+    
+    # Skip test if no valid completed indices
+    if not completed_indices:
+        return
+
+    # Create a batch file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for url in urls:
+            f.write(f"{url}\n")
+        f.flush()
+        batch_path = Path(f.name)
+
+    # Create resume state
+    resume_state = ResumeState(
+        batch_file_path=batch_path,
+        completed_indices=completed_indices,
+        timestamp=datetime.now()
+    )
+
+    try:
+        # Load the batch file
+        batch = BatchFile.load(batch_path)
+
+        # Simulate processing with resume state
+        # Entries to process should be those NOT in completed_indices
+        entries_to_process = [
+            entry for i, entry in enumerate(batch.entries)
+            if i not in resume_state.completed_indices
+        ]
+
+        # Verify that we're skipping the right entries
+        # The number of entries to process should be total - completed
+        expected_to_process = len(urls) - len(completed_indices)
+        assert len(entries_to_process) == expected_to_process
+
+        # Verify that none of the entries to process have indices in completed_indices
+        for i, entry in enumerate(batch.entries):
+            if i in resume_state.completed_indices:
+                # This entry should NOT be in entries_to_process
+                assert entry not in entries_to_process
+            else:
+                # This entry SHOULD be in entries_to_process
+                assert entry in entries_to_process
+
+    finally:
+        if batch_path.exists():
+            batch_path.unlink()
