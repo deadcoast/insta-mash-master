@@ -1,30 +1,30 @@
 # Feature Completion Handoff
 
 ## Completed Feature
-resume-support
+smart-platform-detection
 
 ## Status Summary
 - Requirements: ✅ Complete
-- Design: ✅ Complete (25 correctness properties)
+- Design: ✅ Complete (19 correctness properties)
 - Tasks: ✅ Complete (comprehensive testing enabled)
 
 ## Next Feature
-smart-platform-detection
+shell-completions
 
-Location: `.kiro/specs/smart-platform-detection/`
+Location: `.kiro/specs/shell-completions/`
 
 ## Remaining Features
 - [x] batch-mode
 - [x] progress-display
 - [x] resume-support
-- [ ] smart-platform-detection
+- [x] smart-platform-detection
 - [ ] shell-completions
 - [ ] post-download-hooks
 
 ## Notes for Next Agent
 
 ### Context
-This is the third handoff in the feature completion orchestration. The resume-support feature has been fully specified with requirements, design (including 25 correctness properties), and tasks (with comprehensive testing enabled).
+This is the fourth handoff in the feature completion orchestration. The smart-platform-detection feature has been fully specified with requirements, design (including 19 correctness properties), and tasks (with comprehensive testing enabled).
 
 ### Patterns Established
 1. **EARS Format**: All requirements follow EARS patterns (WHEN/THE/SHALL)
@@ -36,35 +36,36 @@ This is the third handoff in the feature completion orchestration. The resume-su
 7. **Comprehensive Testing**: User prefers all tests required (no optional tasks)
 
 ### Your Task
-Complete the design and tasks documents for **smart-platform-detection**. The requirements are already written at `.kiro/specs/smart-platform-detection/requirements.md`.
+Complete the design and tasks documents for **shell-completions**. The requirements are already written at `.kiro/specs/shell-completions/requirements.md`.
 
 Follow the workflow in `.kiro/specs/feature-completion-orchestration/tasks.md`:
-1. Read the smart-platform-detection requirements
+1. Read the shell-completions requirements
 2. Perform prework analysis
 3. Perform property reflection to eliminate redundancy
 4. Create design.md with correctness properties
 5. Get user approval
 6. Create tasks.md with implementation plan
 7. Get user approval (user wants comprehensive testing, no optional tasks)
-8. Create handoff for next agent (shell-completions)
+8. Create handoff for next agent (post-download-hooks)
 
 ### Important Notes
-- The smart-platform-detection feature focuses on automatically detecting the platform (Instagram, Reddit, etc.) from URLs
-- Consider URL pattern matching, preset configuration, and error handling for unknown platforms
-- Think about extensibility for adding new platforms
-- Consider how platform detection integrates with existing CLI options
-- URL parsing and pattern matching are good candidates for property-based testing
+- The shell-completions feature focuses on providing tab completion for bash, zsh, and fish shells
+- Consider command structure, option completion, dynamic value completion (presets, profiles)
+- Think about installation methods and shell-specific syntax
+- Consider how completions integrate with the CLI structure
+- Shell completion scripts are good candidates for property-based testing (valid syntax, completeness)
 
-### Resume-Support Insights
-- Successfully created 25 correctness properties covering all testable requirements
-- Property reflection helped consolidate state save properties (4.1, 4.2, 4.3) and partial download cleanup (3.1, 3.5)
-- Atomic file operations are critical for state persistence
-- Signal handling requires careful coordination with download lifecycle
-- Archive integration adds complexity but ensures consistency
-- Round-trip properties are essential for state serialization/deserialization
+### Smart-Platform-Detection Insights
+- Successfully created 19 correctness properties covering all testable requirements
+- Property reflection consolidated platform domain detection (1.1, 1.3, 2.1-2.4) into a single comprehensive property
+- Also consolidated Instagram content-type detection (3.1, 3.2, 3.3) and duplicate display properties (1.4, 4.2)
+- Pattern matching with regex is central to the feature - requires careful testing
+- Precedence rules (custom > built-in, user > auto) are critical correctness properties
+- Confidence scoring adds complexity but improves user experience
+- Custom rules provide extensibility while maintaining system integrity
 
 ## Progress
-Completed: 3 of 6 features (batch-mode, progress-display, resume-support)
-Remaining: 3 of 6 features
+Completed: 4 of 6 features (batch-mode, progress-display, resume-support, smart-platform-detection)
+Remaining: 2 of 6 features
 
-Next agent should work on: **smart-platform-detection**
+Next agent should work on: **shell-completions**

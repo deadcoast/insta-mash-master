@@ -1,70 +1,70 @@
 # Implementation Plan
 
-- [ ] 1. Implement batch file parsing
+- [x] 1. Implement batch file parsing
   - Create `BatchEntry` dataclass with parse method
   - Create `BatchFile` dataclass with load method
   - Handle comments, empty lines, and URL-only entries
   - Parse preset and profile specifications from entries
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 1.1 Write property test for file parsing
+- [x] 1.1 Write property test for file parsing
   - **Property 1: File reading completeness**
   - **Validates: Requirements 1.1, 1.2**
 
-- [ ] 1.2 Write property test for order preservation
+- [x] 1.2 Write property test for order preservation
   - **Property 2: Order preservation**
   - **Validates: Requirements 1.5**
 
-- [ ] 2. Implement configuration resolution for batch entries
+- [x] 2. Implement configuration resolution for batch entries
   - Extend configuration system to resolve per-entry options
   - Implement merging of global batch settings with entry-specific config
   - Handle default, preset, and profile application
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 2.1 Write property test for default configuration
+- [x] 2.1 Write property test for default configuration
   - **Property 3: Default configuration application**
   - **Validates: Requirements 2.1**
 
-- [ ] 2.2 Write property test for preset application
+- [x] 2.2 Write property test for preset application
   - **Property 4: Preset application**
   - **Validates: Requirements 2.2**
 
-- [ ] 2.3 Write property test for profile application
+- [x] 2.3 Write property test for profile application
   - **Property 5: Profile application**
   - **Validates: Requirements 2.3**
 
-- [ ] 2.4 Write property test for configuration merging
+- [x] 2.4 Write property test for configuration merging
   - **Property 7: Configuration merging priority**
   - **Validates: Requirements 2.5**
 
-- [ ] 3. Implement batch validation
+- [x] 3. Implement batch validation
   - Create validation logic for batch files
   - Check for syntax errors with line numbers
   - Verify preset and profile references exist
   - Generate validation report with error details
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 3.1 Write property test for invalid entry skipping
+- [x] 3.1 Write property test for invalid entry skipping
   - **Property 6: Invalid entry skipping**
   - **Validates: Requirements 2.4**
 
-- [ ] 3.2 Write property test for validation parsing
+- [x] 3.2 Write property test for validation parsing
   - **Property 20: Validation parsing**
   - **Validates: Requirements 6.1**
 
-- [ ] 3.3 Write property test for validation error reporting
+- [x] 3.3 Write property test for validation error reporting
   - **Property 21: Validation error reporting**
   - **Validates: Requirements 6.2**
 
-- [ ] 3.4 Write property test for validation reference checking
+- [x] 3.4 Write property test for validation reference checking
   - **Property 22: Validation reference checking**
   - **Validates: Requirements 6.3**
 
-- [ ] 3.5 Write property test for validation count accuracy
+- [x] 3.5 Write property test for validation count accuracy
   - **Property 23: Validation count accuracy**
   - **Validates: Requirements 6.4**
 
-- [ ] 3.6 Write property test for validation exit code
+- [x] 3.6 Write property test for validation exit code
   - **Property 24: Validation exit code**
   - **Validates: Requirements 6.5**
 
