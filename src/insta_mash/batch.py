@@ -329,6 +329,15 @@ class BatchProgress:
         
         return capture.get()
 
+    def get_exit_code(self) -> int:
+        """
+        Get the appropriate exit code based on batch results.
+
+        Returns:
+            0 if all operations succeeded, 1 if any failed
+        """
+        return 0 if self.failed == 0 else 1
+
 
 @dataclass
 class ResumeState:

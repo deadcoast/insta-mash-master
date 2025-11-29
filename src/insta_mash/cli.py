@@ -452,6 +452,123 @@ def sites(filter_str: Optional[str]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# batch command
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def batch() -> None:
+    """Batch download operations."""
+    pass
+
+
+@batch.command("run")
+@click.argument("file", type=click.Path(exists=True, path_type=Path))
+@click.option("--delay", "-d", type=float, default=0.0, help="Delay between downloads in seconds")
+@click.option("--dry-run", "-n", is_flag=True, help="Simulate without downloading")
+@click.option("--resume", "-r", is_flag=True, help="Resume from previous interrupted session")
+def batch_run(
+    file: Path,
+    delay: float,
+    dry_run: bool,
+    resume: bool,
+) -> None:
+    """Run batch downloads from a file."""
+    from insta_mash.batch import BatchExecutor, BatchFile, ResumeState
+
+    config = get_config()
+
+    # Load batch file
+    try:
+        batch_file = BatchFile.load(file)
+    except FileNotFoundError:
+        console.print(f"[red]Batch file not found:[/red] {file}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error loading batch file:[/red] {e}")
+        sys.exit(1)
+
+    if not batch_file.entries:
+        console.print("[yellow]No entries found in batch file[/yellow]")
+        sys.exit(0)
+
+    # Load resume state if requested
+    resume_state = None
+    if resume:
+        resume_path = file.parent / f".{file.name}.resume"
+        resume_state = ResumeState.load(resume_path)
+        if resume_state:
+            console.print(f"[cyan]Resuming from previous session ({len(resume_state.completed_indices)} completed)[/cyan]")
+        else:
+            console.print("[yellow]No resume state found, starting fresh[/yellow]")
+
+    # Create executor
+    executor = BatchExecutor(
+        batch_file=batch_file,
+        config=config,
+        delay=delay,
+        dry_run=dry_run,
+        resume_state=resume_state,
+    )
+
+    # Execute batch
+    try:
+        progress = executor.execute()
+        
+        # Display final report
+        console.print(progress.get_final_report())
+        
+        # Exit with appropriate code
+        sys.exit(progress.get_exit_code())
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted[/yellow]")
+        
+        # Save resume state
+        resume_path = file.parent / f".{file.name}.resume"
+        from datetime import datetime
+        resume_state = ResumeState(
+            batch_file_path=file,
+            completed_indices=set(range(executor.progress.completed)),
+            timestamp=datetime.now(),
+        )
+        resume_state.save(resume_path)
+        console.print(f"[cyan]Progress saved to {resume_path}[/cyan]")
+        sys.exit(130)
+
+
+@batch.command("validate")
+@click.argument("file", type=click.Path(exists=True, path_type=Path))
+def batch_validate(file: Path) -> None:
+    """Validate a batch file."""
+    from insta_mash.batch import BatchFile
+
+    config = get_config()
+
+    # Load batch file
+    try:
+        batch_file = BatchFile.load(file)
+    except FileNotFoundError:
+        console.print(f"[red]Batch file not found:[/red] {file}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error loading batch file:[/red] {e}")
+        sys.exit(1)
+
+    # Validate
+    errors = batch_file.validate(config)
+
+    if not errors:
+        console.print(f"[green]✓ Batch file is valid[/green]")
+        console.print(f"[dim]Found {len(batch_file.entries)} valid entries[/dim]")
+        sys.exit(0)
+    else:
+        console.print(f"[red]✗ Validation failed with {len(errors)} errors:[/red]\n")
+        for error in errors:
+            console.print(f"  Line {error.line_number}: {error.message}")
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # version command
 # ---------------------------------------------------------------------------
 

@@ -107,7 +107,7 @@
   - **Property 17: Resume skip behavior**
   - **Validates: Requirements 5.3**
 
-- [-] 6. Implement batch executor
+- [x] 6. Implement batch executor
   - Create `BatchExecutor` class
   - Implement sequential execution of batch entries
   - Integrate with existing download logic from `grab` command
@@ -124,26 +124,26 @@
   - **Property 13: Failure resilience**
   - **Validates: Requirements 4.2**
 
-- [-] 6.3 Write property test for delay timing
+- [x] 6.3 Write property test for delay timing
   - **Property 18: Delay timing**
   - **Validates: Requirements 5.4**
 
-- [ ] 6.4 Write property test for dry-run mode
+- [x] 6.4 Write property test for dry-run mode
   - **Property 19: Dry-run file creation**
   - **Validates: Requirements 5.5**
 
-- [ ] 7. Implement exit code handling
+- [x] 7. Implement exit code handling
   - Set appropriate exit codes based on batch results
   - Exit with 0 for all successes
   - Exit with non-zero for any failures
   - _Requirements: 4.4, 4.5_
 
-- [ ] 7.1 Write property test for exit codes
+- [x] 7.1 Write property test for exit codes
   - **Property 14: Exit code on failure**
   - **Property 15: Exit code on success**
   - **Validates: Requirements 4.4, 4.5**
 
-- [ ] 8. Implement CLI commands
+- [x] 8. Implement CLI commands
   - Add `batch` command group to CLI
   - Implement `mash batch run <file>` command with options
   - Implement `mash batch validate <file>` command
@@ -151,17 +151,17 @@
   - Wire up all components
   - _Requirements: All_
 
-- [ ] 8.1 Write integration tests for batch commands
+- [x] 8.1 Write integration tests for batch commands
   - Test end-to-end batch execution
   - Test validation command
   - Test resume functionality
   - Test error handling
 
-- [ ] 9. Add batch mode documentation
+- [x] 9. Add batch mode documentation
   - Update README with batch mode examples
   - Add batch file format documentation
   - Document CLI commands and options
   - Add troubleshooting guide
 
-- [ ] 10. Checkpoint - Ensure all tests pass
+- [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
