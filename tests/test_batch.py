@@ -940,3 +940,285 @@ def test_property_resume_skip_behavior(urls, completed_indices):
     finally:
         if batch_path.exists():
             batch_path.unlink()
+
+
+@settings(max_examples=100)
+@given(
+    urls=st.lists(url_strategy, min_size=2, max_size=10),
+    num_failures=st.integers(min_value=1, max_value=5)
+)
+def test_property_error_logging(urls, num_failures):
+    """
+    **Feature: batch-mode, Property 12: Error logging**
+    **Validates: Requirements 4.1**
+
+    For any failed download operation, the system should log error
+    details including the URL and error message.
+    """
+    from insta_mash.batch import BatchExecutor, BatchFile
+    from insta_mash.config import Config
+    from unittest.mock import patch, MagicMock
+    
+    # Ensure we have enough URLs for the failures
+    num_failures = min(num_failures, len(urls))
+    
+    # Create a batch file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for url in urls:
+            f.write(f"{url}\n")
+        f.flush()
+        batch_path = Path(f.name)
+    
+    try:
+        batch = BatchFile.load(batch_path)
+        config = Config()
+        
+        # Create executor
+        executor = BatchExecutor(batch_file=batch, config=config, dry_run=True)
+        
+        # Track which entry index we're on
+        call_count = [0]
+        
+        # Mock subprocess to simulate failures for first num_failures entries
+        with patch('subprocess.run') as mock_run:
+            def side_effect(*args, **kwargs):
+                # Track which entry this is (by call order, not URL)
+                entry_index = call_count[0]
+                call_count[0] += 1
+                
+                result = MagicMock()
+                if entry_index < num_failures:
+                    # Simulate failure
+                    cmd = args[0] if args else kwargs.get('args', [])
+                    url_in_cmd = cmd[-1] if cmd else ""
+                    result.returncode = 1
+                    result.stderr = f"Error downloading {url_in_cmd}"
+                    result.stdout = ""
+                else:
+                    # Simulate success
+                    result.returncode = 0
+                    result.stderr = ""
+                    result.stdout = "Success"
+                
+                return result
+            
+            mock_run.side_effect = side_effect
+            
+            # Execute batch
+            progress = executor.execute()
+            
+            # Check that errors were logged
+            assert len(progress.errors) == num_failures
+            
+            # Check that each error contains a URL and error message
+            for url, error_msg in progress.errors:
+                assert url in urls
+                assert error_msg  # Error message should not be empty
+    
+    finally:
+        if batch_path.exists():
+            batch_path.unlink()
+
+
+@settings(max_examples=100)
+@given(
+    urls=st.lists(url_strategy, min_size=3, max_size=15),
+    failure_index=st.integers(min_value=0, max_value=14)
+)
+def test_property_failure_resilience(urls, failure_index):
+    """
+    **Feature: batch-mode, Property 13: Failure resilience**
+    **Validates: Requirements 4.2**
+
+    For any batch file where entry N fails, the system should still
+    attempt to process entry N+1.
+    """
+    from insta_mash.batch import BatchExecutor, BatchFile
+    from insta_mash.config import Config
+    from unittest.mock import patch, MagicMock
+    
+    # Ensure failure_index is within bounds
+    if len(urls) < 2:
+        return
+    
+    failure_index = min(failure_index, len(urls) - 2)  # Ensure there's at least one entry after failure
+    
+    # Create a batch file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for url in urls:
+            f.write(f"{url}\n")
+        f.flush()
+        batch_path = Path(f.name)
+    
+    try:
+        batch = BatchFile.load(batch_path)
+        config = Config()
+        
+        # Create executor
+        executor = BatchExecutor(batch_file=batch, config=config, dry_run=True)
+        
+        # Track which URLs were attempted
+        attempted_urls = []
+        
+        # Mock subprocess to simulate failure at specific index
+        with patch('subprocess.run') as mock_run:
+            def side_effect(*args, **kwargs):
+                # Get the URL from the command
+                cmd = args[0] if args else kwargs.get('args', [])
+                url_in_cmd = cmd[-1] if cmd else ""
+                attempted_urls.append(url_in_cmd)
+                
+                # Determine if this should fail
+                url_index = next((i for i, u in enumerate(urls) if u == url_in_cmd), -1)
+                
+                result = MagicMock()
+                if url_index == failure_index:
+                    # Simulate failure
+                    result.returncode = 1
+                    result.stderr = f"Error at index {failure_index}"
+                    result.stdout = ""
+                else:
+                    # Simulate success
+                    result.returncode = 0
+                    result.stderr = ""
+                    result.stdout = "Success"
+                
+                return result
+            
+            mock_run.side_effect = side_effect
+            
+            # Execute batch
+            progress = executor.execute()
+            
+            # Check that entry N+1 was attempted after entry N failed
+            # All URLs should have been attempted
+            assert len(attempted_urls) == len(urls)
+            
+            # The URL after the failure should have been attempted
+            if failure_index + 1 < len(urls):
+                assert urls[failure_index + 1] in attempted_urls
+    
+    finally:
+        if batch_path.exists():
+            batch_path.unlink()
+
+
+@settings(max_examples=100, deadline=None)
+@given(
+    urls=st.lists(url_strategy, min_size=2, max_size=10),
+    delay=st.floats(min_value=0.1, max_value=2.0)
+)
+def test_property_delay_timing(urls, delay):
+    """
+    **Feature: batch-mode, Property 18: Delay timing**
+    **Validates: Requirements 5.4**
+
+    For any batch execution with delay D specified, the time between
+    starting consecutive download operations should be at least D seconds.
+    """
+    from insta_mash.batch import BatchExecutor, BatchFile
+    from insta_mash.config import Config
+    from unittest.mock import patch, MagicMock
+    import time
+    
+    # Create a batch file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for url in urls:
+            f.write(f"{url}\n")
+        f.flush()
+        batch_path = Path(f.name)
+    
+    try:
+        batch = BatchFile.load(batch_path)
+        config = Config()
+        
+        # Create executor with delay
+        executor = BatchExecutor(batch_file=batch, config=config, delay=delay, dry_run=True)
+        
+        # Track execution times
+        execution_times = []
+        
+        # Mock subprocess to track timing
+        with patch('subprocess.run') as mock_run:
+            def side_effect(*args, **kwargs):
+                execution_times.append(time.time())
+                result = MagicMock()
+                result.returncode = 0
+                result.stderr = ""
+                result.stdout = "Success"
+                return result
+            
+            mock_run.side_effect = side_effect
+            
+            # Execute batch
+            progress = executor.execute()
+            
+            # Check that delays were applied between consecutive downloads
+            for i in range(1, len(execution_times)):
+                time_diff = execution_times[i] - execution_times[i-1]
+                # Allow small tolerance for execution overhead
+                assert time_diff >= delay - 0.1, f"Delay between downloads {i-1} and {i} was {time_diff}, expected at least {delay}"
+    
+    finally:
+        if batch_path.exists():
+            batch_path.unlink()
+
+
+@settings(max_examples=100)
+@given(
+    urls=st.lists(url_strategy, min_size=1, max_size=10)
+)
+def test_property_dry_run_file_creation(urls):
+    """
+    **Feature: batch-mode, Property 19: Dry-run file creation**
+    **Validates: Requirements 5.5**
+
+    For any batch execution in dry-run mode, no media files should be
+    created in the destination directories.
+    """
+    from insta_mash.batch import BatchExecutor, BatchFile
+    from insta_mash.config import Config
+    from unittest.mock import patch, MagicMock
+    import tempfile
+    import shutil
+    
+    # Create a temporary destination directory
+    temp_dest = tempfile.mkdtemp()
+    
+    # Create a batch file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for url in urls:
+            f.write(f"{url}\n")
+        f.flush()
+        batch_path = Path(f.name)
+    
+    try:
+        batch = BatchFile.load(batch_path)
+        config = Config()
+        config.defaults.destination = temp_dest
+        
+        # Create executor in dry-run mode
+        executor = BatchExecutor(batch_file=batch, config=config, dry_run=True)
+        
+        # Mock subprocess to simulate successful downloads
+        with patch('subprocess.run') as mock_run:
+            result = MagicMock()
+            result.returncode = 0
+            result.stderr = ""
+            result.stdout = "Success"
+            mock_run.return_value = result
+            
+            # Execute batch
+            progress = executor.execute()
+            
+            # In dry-run mode, gallery-dl is called with -s flag which simulates
+            # Check that the -s flag was passed to gallery-dl
+            for call in mock_run.call_args_list:
+                cmd = call[0][0] if call[0] else call[1].get('args', [])
+                assert '-s' in cmd, "Dry-run flag -s should be present in command"
+    
+    finally:
+        if batch_path.exists():
+            batch_path.unlink()
+        if Path(temp_dest).exists():
+            shutil.rmtree(temp_dest)

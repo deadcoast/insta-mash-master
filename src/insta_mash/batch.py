@@ -440,15 +440,10 @@ class BatchExecutor:
             console.print(self.progress.display())
 
             # Execute the entry
-            success = self.execute_entry(entry)
+            success, error_msg = self.execute_entry(entry)
 
             # Update progress
-            if not success:
-                # Get the last error from progress.errors if available
-                error_msg = self.progress.errors[-1][1] if self.progress.errors else "Unknown error"
-                self.progress.update(success=False, url=entry.url, error=error_msg)
-            else:
-                self.progress.update(success=True, url=entry.url)
+            self.progress.update(success=success, url=entry.url, error=error_msg if not success else "")
 
             # Apply delay between downloads (except after last one)
             if self.delay > 0 and index < len(self.batch_file.entries) - 1:
@@ -456,7 +451,7 @@ class BatchExecutor:
 
         return self.progress
 
-    def execute_entry(self, entry: BatchEntry) -> bool:
+    def execute_entry(self, entry: BatchEntry) -> tuple[bool, str]:
         """
         Execute a single batch entry.
 
@@ -464,7 +459,7 @@ class BatchExecutor:
             entry: The batch entry to execute
 
         Returns:
-            True if successful, False otherwise
+            Tuple of (success, error_message). error_message is empty string if successful.
         """
         import subprocess
         import os
@@ -501,18 +496,15 @@ class BatchExecutor:
                 # Log error
                 error_msg = result.stderr.strip() if result.stderr else f"Exit code {result.returncode}"
                 console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
-                self.progress.errors.append((entry.url, error_msg))
-                return False
+                return False, error_msg
 
-            return True
+            return True, ""
 
         except subprocess.TimeoutExpired:
             error_msg = "Download timed out after 5 minutes"
             console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
-            self.progress.errors.append((entry.url, error_msg))
-            return False
+            return False, error_msg
         except Exception as e:
             error_msg = str(e)
             console.print(f"[red]Error downloading {entry.url}:[/red] {error_msg}")
-            self.progress.errors.append((entry.url, error_msg))
-            return False
+            return False, error_msg

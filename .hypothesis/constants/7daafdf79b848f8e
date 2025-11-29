@@ -1,0 +1,4 @@
+# file: /Users/deadcoast/github/insta-mash/src/insta_mash/batch.py
+# hypothesis_version: 6.148.3
+
+[0.0, 300, '\nErrors:\n', '#', '-s', ':', 'Batch Complete!\n\n', 'Batch Progress', 'Final Report', 'Invalid syntax', 'Unknown error', 'batch_file_path', 'blue', 'bold', 'bold cyan', 'bold green', 'bold red', 'completed_indices', 'dim', 'gallery-dl', 'green', 'preset', 'profile', 'r', 'red', 'timestamp', 'utf-8', 'w', 'yellow']

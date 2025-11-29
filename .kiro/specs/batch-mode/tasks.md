@@ -116,15 +116,15 @@
   - Support dry-run mode
   - _Requirements: 4.1, 4.2, 5.4, 5.5_
 
-- [ ] 6.1 Write property test for error logging
+- [x] 6.1 Write property test for error logging
   - **Property 12: Error logging**
   - **Validates: Requirements 4.1**
 
-- [ ] 6.2 Write property test for failure resilience
+- [x] 6.2 Write property test for failure resilience
   - **Property 13: Failure resilience**
   - **Validates: Requirements 4.2**
 
-- [ ] 6.3 Write property test for delay timing
+- [-] 6.3 Write property test for delay timing
   - **Property 18: Delay timing**
   - **Validates: Requirements 5.4**
 
